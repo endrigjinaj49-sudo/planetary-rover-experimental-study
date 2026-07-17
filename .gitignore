@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ROS 2
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Planner temporary output
+experiments/raw_outputs/*
+!experiments/raw_outputs/.gitkeep
+
+# Automatically generated PDDL instances
+experiments/generated_problems/*
+!experiments/generated_problems/.gitkeep
+
+# Operating system files
+.DS_Store
+Thumbs.db
