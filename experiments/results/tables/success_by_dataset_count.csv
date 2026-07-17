@@ -1,0 +1,4 @@
+dataset_count,instances,solved,unsolvable,timeout,success_rate_all,success_rate_classified
+3,45,27,18,0,0.6,0.6
+5,45,21,24,0,0.4666666666666667,0.4666666666666667
+7,45,18,25,2,0.4,0.4186046511627907

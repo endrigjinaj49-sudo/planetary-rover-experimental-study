@@ -1,0 +1,4 @@
+memory_level,instances,solved,unsolvable,timeout,success_rate_all,success_rate_classified
+low,45,22,23,0,0.4888888888888889,0.4888888888888889
+medium,45,22,22,1,0.4888888888888889,0.5
+high,45,22,22,1,0.4888888888888889,0.5

@@ -1,0 +1,31 @@
+{
+  "status": "unsolvable",
+  "solved": false,
+  "reported_plan_length": null,
+  "reported_elapsed_time": null,
+  "plan_makespan": null,
+  "action_count": 0,
+  "move_actions": 0,
+  "collect_actions": 0,
+  "offload_actions": 0,
+  "waiting_periods": 0,
+  "total_waiting_time": 0,
+  "actions": [],
+  "waits": [],
+  "domain": "/mnt/c/Users/Endri/Desktop/planetary-rover-experimental-study/planning_models/pddl_plus/domain-memory-rover-experimental.pddl",
+  "problem": "/mnt/c/Users/Endri/Desktop/planetary-rover-experimental-study/experiments/generated_problems/rover-timed-n7-mem-high-corr-medium-seed-1.pddl",
+  "output_file": "/mnt/c/Users/Endri/Desktop/planetary-rover-experimental-study/experiments/raw_outputs/timeout_reruns_180s/rover-timed-n7-mem-high-corr-medium-seed-1.txt",
+  "planner": "ENHSP default",
+  "timeout_seconds": 180.0,
+  "wall_runtime_seconds": 108.40141,
+  "return_code": 0,
+  "command": [
+    "java",
+    "-jar",
+    "/home/endri/enhsp/ENHSP-Public/enhsp-dist/enhsp.jar",
+    "-o",
+    "/mnt/c/Users/Endri/Desktop/planetary-rover-experimental-study/planning_models/pddl_plus/domain-memory-rover-experimental.pddl",
+    "-f",
+    "/mnt/c/Users/Endri/Desktop/planetary-rover-experimental-study/experiments/generated_problems/rover-timed-n7-mem-high-corr-medium-seed-1.pddl"
+  ]
+}

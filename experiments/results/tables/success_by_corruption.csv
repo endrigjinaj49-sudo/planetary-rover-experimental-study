@@ -1,0 +1,4 @@
+corruption_level,instances,solved,unsolvable,timeout,success_rate_all,success_rate_classified
+low,45,45,0,0,1.0,1.0
+medium,45,21,22,2,0.4666666666666667,0.4883720930232558
+high,45,0,45,0,0.0,0.0

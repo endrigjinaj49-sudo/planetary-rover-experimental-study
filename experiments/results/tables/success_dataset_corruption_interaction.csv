@@ -1,0 +1,10 @@
+dataset_count,corruption_level,instances,solved,unsolvable,timeout,success_rate_all,success_rate_classified
+3,low,15,15,0,0,1.0,1.0
+3,medium,15,12,3,0,0.8,0.8
+3,high,15,0,15,0,0.0,0.0
+5,low,15,15,0,0,1.0,1.0
+5,medium,15,6,9,0,0.4,0.4
+5,high,15,0,15,0,0.0,0.0
+7,low,15,15,0,0,1.0,1.0
+7,medium,15,3,10,2,0.2,0.23076923076923078
+7,high,15,0,15,0,0.0,0.0

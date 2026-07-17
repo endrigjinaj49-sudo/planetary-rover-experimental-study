@@ -1,0 +1,6 @@
+test,statistic,p_value,effect_size,effect_size_name,sample_size
+Chi-square: corruption level vs final status,90.0208261020479,2.832865685012399e-20,0.8227079169162961,Cramer's V,133
+Friedman: memory level effect on plan_makespan,8.666666666666654,0.013123728736941044,0.2888888888888885,Kendall's W,15
+Friedman: memory level effect on estimated_travel_time,13.086956521739129,0.001439472919002386,0.436231884057971,Kendall's W,15
+Friedman: memory level effect on action_count,13.086956521739129,0.001439472919002386,0.436231884057971,Kendall's W,15
+Kruskal-Wallis: dataset count effect on runtime,107.67462599854764,4.156732182731733e-24,0.8005653484738458,Epsilon squared,135
