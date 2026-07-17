@@ -1,0 +1,28 @@
+{
+  "dataset_counts": [3, 5, 7],
+
+  "memory_ratios": {
+    "low": 0.35,
+    "medium": 0.60,
+    "high": 1.00
+  },
+
+  "dataset_size": {
+    "min": 2,
+    "max": 6
+  },
+
+  "encoding_time": {
+    "min": 2,
+    "max": 5
+  },
+
+  "corruption_margin_choices": {
+    "low": [2, 3, 4, 5],
+    "medium": [-1, 1, 2, 3],
+    "high": [-3, -2, -1, 1]
+  },
+
+  "encoding_rate": 1.0,
+  "corruption_rate": 1.0
+}

@@ -67,19 +67,21 @@ def parse_enhsp_output(output_text: str) -> dict[str, Any]:
         content_lower = content.lower()
 
         if "waiting" in content_lower:
-            duration_match = WAIT_DURATION_PATTERN.search(content)
+            end_time_match = WAIT_DURATION_PATTERN.search(content)
 
-            duration = (
-                float(duration_match.group(1))
-                if duration_match
-                else 0.0
+            end_time = (
+                float(end_time_match.group(1))
+                if end_time_match
+                else timestamp
             )
+
+            duration = max(0.0, end_time - timestamp)
 
             waiting_periods.append(
                 {
                     "start_time": timestamp,
+                    "end_time": end_time,
                     "duration": duration,
-                    "end_time": timestamp + duration,
                 }
             )
 
