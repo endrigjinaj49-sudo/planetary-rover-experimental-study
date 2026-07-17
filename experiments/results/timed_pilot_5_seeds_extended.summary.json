@@ -1,0 +1,16 @@
+{
+  "total_instances": 135,
+  "standard_timeout_seconds": 60,
+  "extended_timeout_seconds": 180,
+  "status_at_60_seconds": {
+    "solved": 66,
+    "unsolvable": 62,
+    "timeout": 7
+  },
+  "status_after_extended_reruns": {
+    "solved": 66,
+    "unsolvable": 67,
+    "timeout": 2
+  },
+  "extended_instances": 7
+}
