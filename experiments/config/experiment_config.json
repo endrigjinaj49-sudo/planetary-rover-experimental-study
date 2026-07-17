@@ -17,10 +17,12 @@
     "max": 5
   },
 
+  "travel_time_per_edge": 2.0,
+
   "corruption_margin_choices": {
     "low": [2, 3, 4, 5],
     "medium": [-1, 1, 2, 3],
-    "high": [-3, -2, -1, 1]
+    "high": [-2, -1, 1, 2]
   },
 
   "encoding_rate": 1.0,

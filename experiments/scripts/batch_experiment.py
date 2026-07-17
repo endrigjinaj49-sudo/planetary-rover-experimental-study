@@ -29,6 +29,7 @@ from problem_generator import generate_problem, load_config
 
 RESULT_FIELDS = [
     "instance_id",
+    "model",
     "seed",
     "dataset_count",
     "memory_level",
@@ -36,6 +37,7 @@ RESULT_FIELDS = [
     "memory_capacity",
     "total_dataset_size",
     "memory_utilization_ratio",
+    "travel_time_per_edge",
     "corruption_level",
     "safe_dataset_count",
     "unsafe_dataset_count",
@@ -53,6 +55,8 @@ RESULT_FIELDS = [
     "reported_plan_length",
     "reported_elapsed_time",
     "plan_makespan",
+    "estimated_travel_time",
+    "stationary_time",
     "action_count",
     "move_actions",
     "collect_actions",
@@ -114,8 +118,36 @@ def create_result_row(
         else None
     )
 
+    model = metadata.get("model", "original")
+
+    travel_time_per_edge = float(
+        metadata.get("travel_time_per_edge", 0.0)
+    )
+
+    move_actions = int(
+        planner_result.get("move_actions", 0) or 0
+    )
+
+    plan_makespan = planner_result.get("plan_makespan")
+
+    estimated_travel_time = (
+        move_actions * travel_time_per_edge
+        if model == "timed"
+        else 0.0
+    )
+
+    stationary_time = (
+        max(
+            0.0,
+            float(plan_makespan) - estimated_travel_time,
+        )
+        if plan_makespan is not None
+        else None
+    )
+
     return {
         "instance_id": metadata["instance_id"],
+        "model": model,
         "seed": metadata["seed"],
         "dataset_count": metadata["dataset_count"],
         "memory_level": metadata["memory_level"],
@@ -127,6 +159,7 @@ def create_result_row(
             if memory_utilization_ratio is not None
             else None
         ),
+        "travel_time_per_edge": travel_time_per_edge,
         "corruption_level": metadata["corruption_level"],
         "safe_dataset_count": metadata["safe_dataset_count"],
         "unsafe_dataset_count": metadata["unsafe_dataset_count"],
@@ -153,17 +186,21 @@ def create_result_row(
         "reported_elapsed_time": planner_result.get(
             "reported_elapsed_time"
         ),
-        "plan_makespan": planner_result.get(
-            "plan_makespan"
+        "plan_makespan": plan_makespan,
+        "estimated_travel_time": round(
+            estimated_travel_time,
+            6,
+        ),
+        "stationary_time": (
+            round(stationary_time, 6)
+            if stationary_time is not None
+            else None
         ),
         "action_count": planner_result.get(
             "action_count",
             0,
         ),
-        "move_actions": planner_result.get(
-            "move_actions",
-            0,
-        ),
+        "move_actions": move_actions,
         "collect_actions": planner_result.get(
             "collect_actions",
             0,
@@ -243,13 +280,23 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--model",
+        choices=["original", "timed"],
+        default="original",
+        help=(
+            "Planning model to evaluate. "
+            "Default: original."
+        ),
+    )
+
+    parser.add_argument(
         "--domain",
         type=Path,
-        default=Path(
-            "planning_models/pddl_plus/"
-            "domain-memory-rover-plus.pddl"
+        default=None,
+        help=(
+            "Optional domain-file override. When omitted, "
+            "the correct domain is selected from --model."
         ),
-        help="PDDL+ domain file.",
     )
 
     parser.add_argument(
@@ -374,7 +421,19 @@ def main() -> int:
         )
         return 1
 
-    domain_path = arguments.domain.resolve()
+    if arguments.domain is not None:
+        domain_path = arguments.domain.resolve()
+    elif arguments.model == "timed":
+        domain_path = Path(
+            "planning_models/pddl_plus/"
+            "domain-memory-rover-experimental.pddl"
+        ).resolve()
+    else:
+        domain_path = Path(
+            "planning_models/pddl_plus/"
+            "domain-memory-rover-plus.pddl"
+        ).resolve()
+
     enhsp_jar = arguments.enhsp_jar.expanduser().resolve()
 
     if not domain_path.is_file():
@@ -485,6 +544,7 @@ def main() -> int:
                     memory_level=memory_level,
                     corruption_level=corruption_level,
                     seed=seed,
+                    model=arguments.model,
                 )
 
                 instance_id = metadata["instance_id"]
@@ -534,7 +594,8 @@ def main() -> int:
             except Exception as error:
                 # Continue the batch even if one instance fails.
                 instance_id = (
-                    f"rover-n{dataset_count}"
+                    f"rover-{arguments.model}"
+                    f"-n{dataset_count}"
                     f"-mem-{memory_level}"
                     f"-corr-{corruption_level}"
                     f"-seed-{seed}"
@@ -542,6 +603,7 @@ def main() -> int:
 
                 metadata = {
                     "instance_id": instance_id,
+                    "model": arguments.model,
                     "seed": seed,
                     "dataset_count": dataset_count,
                     "memory_level": memory_level,
@@ -550,6 +612,16 @@ def main() -> int:
                     ][memory_level],
                     "memory_capacity": 0,
                     "total_dataset_size": 0,
+                    "travel_time_per_edge": (
+                        float(
+                            config.get(
+                                "travel_time_per_edge",
+                                0.0,
+                            )
+                        )
+                        if arguments.model == "timed"
+                        else 0.0
+                    ),
                     "corruption_level": corruption_level,
                     "safe_dataset_count": 0,
                     "unsafe_dataset_count": 0,
@@ -637,6 +709,8 @@ def main() -> int:
             arguments.runs_per_condition
         ),
         "seed_start": arguments.seed_start,
+        "model": arguments.model,
+        "domain": str(domain_path),
         "planner": (
             arguments.planner
             or "ENHSP default"

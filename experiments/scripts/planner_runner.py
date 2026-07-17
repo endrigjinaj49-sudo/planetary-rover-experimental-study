@@ -134,6 +134,7 @@ def parse_enhsp_output(output_text: str) -> dict[str, Any]:
         "action_count": len(actions),
         "move_actions": sum(
             action.startswith("(move ")
+            or action.startswith("(start-move ")
             for action in action_names
         ),
         "collect_actions": sum(

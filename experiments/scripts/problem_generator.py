@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """
-Generate reproducible PDDL+ planetary-rover problem instances.
+Generate reproducible planetary-rover PDDL+ problems.
 
-The generated missions vary:
+Two models are supported:
 
-- number of datasets;
-- rover memory pressure;
-- corruption severity;
-- random seed.
-
-Only the problem files change. The original PDDL+ domain remains unchanged.
+- original: instantaneous movement
+- timed: movement represented by an action, process, and arrival event
 """
 
 from __future__ import annotations
@@ -24,7 +20,7 @@ from typing import Any
 
 
 def load_config(config_path: Path) -> dict[str, Any]:
-    """Load and validate the JSON experiment configuration."""
+    """Load the experiment configuration."""
 
     if not config_path.is_file():
         raise FileNotFoundError(
@@ -36,7 +32,7 @@ def load_config(config_path: Path) -> dict[str, Any]:
 
 
 def format_number(value: float | int) -> str:
-    """Format numbers cleanly for PDDL."""
+    """Format a number for use in PDDL."""
 
     numeric_value = float(value)
 
@@ -51,34 +47,83 @@ def calculate_memory_capacity(
     memory_ratio: float,
 ) -> int:
     """
-    Calculate memory capacity relative to the total data volume.
+    Calculate memory capacity relative to total data volume.
 
-    Capacity is always at least as large as the largest individual
-    dataset. Therefore, every dataset can fit individually.
+    Every dataset is guaranteed to fit individually.
     """
 
     total_size = sum(dataset_sizes)
     largest_dataset = max(dataset_sizes)
 
-    proportional_capacity = math.ceil(total_size * memory_ratio)
+    return max(
+        largest_dataset,
+        math.ceil(total_size * memory_ratio),
+    )
 
-    return max(largest_dataset, proportional_capacity)
 
-
-def create_connections(site_names: list[str]) -> list[str]:
-    """Create a bidirectional linear map: base <-> site1 <-> site2..."""
+def create_map(
+    site_names: list[str],
+    travel_time_per_edge: float,
+    timed_movement: bool,
+) -> tuple[list[str], list[str]]:
+    """Create a bidirectional linear map and travel-time values."""
 
     locations = ["base", *site_names]
-    connections: list[str] = []
+    connection_lines: list[str] = []
+    travel_time_lines: list[str] = []
 
     for index in range(len(locations) - 1):
         first = locations[index]
         second = locations[index + 1]
 
-        connections.append(f"    (connected {first} {second})")
-        connections.append(f"    (connected {second} {first})")
+        connection_lines.extend(
+            [
+                f"    (connected {first} {second})",
+                f"    (connected {second} {first})",
+            ]
+        )
 
-    return connections
+        if timed_movement:
+            formatted_time = format_number(
+                travel_time_per_edge
+            )
+
+            travel_time_lines.extend(
+                [
+                    (
+                        f"    (= (travel-time {first} {second}) "
+                        f"{formatted_time})"
+                    ),
+                    (
+                        f"    (= (travel-time {second} {first}) "
+                        f"{formatted_time})"
+                    ),
+                ]
+            )
+
+    return connection_lines, travel_time_lines
+
+
+def choose_safe_indices(
+    dataset_count: int,
+    safe_fraction: float,
+    rng: random.Random,
+) -> set[int]:
+    """Choose a controlled number of theoretically safe datasets."""
+
+    target_safe_count = int(
+        dataset_count * safe_fraction + 0.5
+    )
+
+    target_safe_count = max(
+        0,
+        min(dataset_count, target_safe_count),
+    )
+
+    indices = list(range(dataset_count))
+    rng.shuffle(indices)
+
+    return set(indices[:target_safe_count])
 
 
 def generate_problem(
@@ -87,30 +132,33 @@ def generate_problem(
     memory_level: str,
     corruption_level: str,
     seed: int,
+    model: str = "original",
 ) -> tuple[str, dict[str, Any]]:
-    """Generate the PDDL+ problem and its experimental metadata."""
+    """Generate one PDDL+ problem and its metadata."""
 
-    dataset_counts = config["dataset_counts"]
-
-    if dataset_count not in dataset_counts:
+    if dataset_count not in config["dataset_counts"]:
         raise ValueError(
-            f"Dataset count must be one of {dataset_counts}; "
-            f"received {dataset_count}."
+            f"Unsupported dataset count: {dataset_count}"
         )
 
-    memory_ratios = config["memory_ratios"]
-
-    if memory_level not in memory_ratios:
+    if memory_level not in config["memory_ratios"]:
         raise ValueError(
-            f"Unknown memory level: {memory_level}"
+            f"Unsupported memory level: {memory_level}"
         )
 
     margin_options = config["corruption_margin_choices"]
 
     if corruption_level not in margin_options:
         raise ValueError(
-            f"Unknown corruption level: {corruption_level}"
+            f"Unsupported corruption level: {corruption_level}"
         )
+
+    if model not in {"original", "timed"}:
+        raise ValueError(
+            "Model must be either 'original' or 'timed'."
+        )
+
+    timed_movement = model == "timed"
 
     size_min = int(config["dataset_size"]["min"])
     size_max = int(config["dataset_size"]["max"])
@@ -121,10 +169,12 @@ def generate_problem(
     encoding_rate = float(config["encoding_rate"])
     corruption_rate = float(config["corruption_rate"])
 
-    # Separate random streams keep the basic mission identical across
-    # memory and corruption conditions when the same seed is used.
+    travel_time_per_edge = float(
+        config["travel_time_per_edge"]
+    )
+
     mission_rng = random.Random(seed)
-    corruption_rng = random.Random(seed + 1_000_003)
+    condition_rng = random.Random(seed + 1_000_003)
 
     dataset_sizes = [
         mission_rng.randint(size_min, size_max)
@@ -136,56 +186,56 @@ def generate_problem(
         for _ in range(dataset_count)
     ]
 
-    selected_margins: list[int] = []
-
-    corruption_choices = margin_options[corruption_level]
-
-    for _ in range(dataset_count):
-        choice_index = corruption_rng.randrange(
-            len(corruption_choices)
-        )
-        selected_margins.append(
-            int(corruption_choices[choice_index])
-        )
-
-    loss_times = [
-        max(1, encoding_time + margin)
-        for encoding_time, margin in zip(
-            encoding_times,
-            selected_margins,
-        )
+    corruption_margin_choices = [
+        float(value)
+        for value in margin_options[corruption_level]
     ]
 
-    memory_ratio = float(memory_ratios[memory_level])
-
-    memory_capacity = calculate_memory_capacity(
-        dataset_sizes,
-        memory_ratio,
-    )
+    dataset_names = [
+        f"data{index}"
+        for index in range(1, dataset_count + 1)
+    ]
 
     site_names = [
         f"site{index}"
         for index in range(1, dataset_count + 1)
     ]
 
-    data_names = [
-        f"data{index}"
-        for index in range(1, dataset_count + 1)
-    ]
+    memory_ratio = float(
+        config["memory_ratios"][memory_level]
+    )
+
+    memory_capacity = calculate_memory_capacity(
+        dataset_sizes,
+        memory_ratio,
+    )
+
+    model_label = "timed" if timed_movement else "original"
 
     problem_name = (
-        f"rover-n{dataset_count}"
+        f"rover-{model_label}"
+        f"-n{dataset_count}"
         f"-mem-{memory_level}"
         f"-corr-{corruption_level}"
         f"-seed-{seed}"
     )
 
-    connection_lines = create_connections(site_names)
+    domain_name = (
+        "memory-rover-experimental"
+        if timed_movement
+        else "memory-rover-plus"
+    )
+
+    connection_lines, travel_time_lines = create_map(
+        site_names=site_names,
+        travel_time_per_edge=travel_time_per_edge,
+        timed_movement=timed_movement,
+    )
 
     data_location_lines = [
-        f"    (data-at {data_name} {site_name})"
-        for data_name, site_name in zip(
-            data_names,
+        f"    (data-at {dataset} {site})"
+        for dataset, site in zip(
+            dataset_names,
             site_names,
         )
     ]
@@ -198,43 +248,75 @@ def generate_problem(
         ),
     ]
 
+    if timed_movement:
+        numeric_lines.append(
+            "    (= (travel-progress rover1) 0)"
+        )
+        numeric_lines.extend(travel_time_lines)
+
     dataset_metadata: list[dict[str, Any]] = []
 
-    for index, data_name in enumerate(data_names):
+    for index, dataset_name in enumerate(dataset_names):
         dataset_size = dataset_sizes[index]
         encoding_time = encoding_times[index]
-        corruption_margin = selected_margins[index]
-        loss_time = loss_times[index]
 
-        encoding_required = encoding_time * encoding_rate
-        corruption_limit = loss_time * corruption_rate
+        if timed_movement:
+            minimum_return_time = (
+                (index + 1) * travel_time_per_edge
+            )
+        else:
+            minimum_return_time = 0.0
+
+        earliest_direct_offload_time = max(
+            float(encoding_time),
+            minimum_return_time,
+        )
+
+        margin = condition_rng.choice(
+            corruption_margin_choices
+        )
+
+        theoretically_safe = margin > 0
+
+        loss_time = max(
+            0.5,
+            earliest_direct_offload_time + margin,
+        )
+
+        encoding_required = (
+            encoding_time * encoding_rate
+        )
+
+        corruption_limit = (
+            loss_time * corruption_rate
+        )
 
         numeric_lines.extend(
             [
                 (
-                    f"    (= (data-size {data_name}) "
+                    f"    (= (data-size {dataset_name}) "
                     f"{format_number(dataset_size)})"
                 ),
+                f"    (= (corruption {dataset_name}) 0)",
                 (
-                    f"    (= (corruption {data_name}) 0)"
-                ),
-                (
-                    f"    (= (corruption-limit {data_name}) "
+                    f"    (= (corruption-limit {dataset_name}) "
                     f"{format_number(corruption_limit)})"
                 ),
                 (
-                    f"    (= (corruption-rate {data_name}) "
+                    f"    (= (corruption-rate {dataset_name}) "
                     f"{format_number(corruption_rate)})"
                 ),
                 (
-                    f"    (= (encoding-progress {data_name}) 0)"
+                    f"    (= (encoding-progress "
+                    f"{dataset_name}) 0)"
                 ),
                 (
-                    f"    (= (encoding-required {data_name}) "
+                    f"    (= (encoding-required "
+                    f"{dataset_name}) "
                     f"{format_number(encoding_required)})"
                 ),
                 (
-                    f"    (= (encoding-rate {data_name}) "
+                    f"    (= (encoding-rate {dataset_name}) "
                     f"{format_number(encoding_rate)})"
                 ),
             ]
@@ -242,31 +324,39 @@ def generate_problem(
 
         dataset_metadata.append(
             {
-                "dataset": data_name,
+                "dataset": dataset_name,
                 "site": site_names[index],
                 "size": dataset_size,
                 "encoding_time": encoding_time,
-                "corruption_margin": corruption_margin,
+                "minimum_return_time": minimum_return_time,
+                "earliest_direct_offload_time": (
+                    earliest_direct_offload_time
+                ),
+                "corruption_margin": margin,
                 "loss_time": loss_time,
-                "theoretically_safe": loss_time > encoding_time,
+                "theoretically_safe": theoretically_safe,
             }
         )
 
     goal_lines: list[str] = []
 
-    for data_name in data_names:
-        goal_lines.append(f"      (offloaded {data_name})")
-        goal_lines.append(f"      (not (lost {data_name}))")
+    for dataset_name in dataset_names:
+        goal_lines.extend(
+            [
+                f"      (offloaded {dataset_name})",
+                f"      (not (lost {dataset_name}))",
+            ]
+        )
 
     problem_text = "\n".join(
         [
             f"(define (problem {problem_name})",
-            "  (:domain memory-rover-plus)",
+            f"  (:domain {domain_name})",
             "",
             "  (:objects",
             "    rover1 - rover",
             f"    base {' '.join(site_names)} - location",
-            f"    {' '.join(data_names)} - data",
+            f"    {' '.join(dataset_names)} - data",
             "  )",
             "",
             "  (:init",
@@ -289,8 +379,14 @@ def generate_problem(
         ]
     )
 
+    safe_dataset_count = sum(
+        dataset["theoretically_safe"]
+        for dataset in dataset_metadata
+    )
+
     metadata = {
         "instance_id": problem_name,
+        "model": model_label,
         "seed": seed,
         "dataset_count": dataset_count,
         "memory_level": memory_level,
@@ -298,13 +394,14 @@ def generate_problem(
         "memory_capacity": memory_capacity,
         "total_dataset_size": sum(dataset_sizes),
         "corruption_level": corruption_level,
-        "safe_dataset_count": sum(
-            dataset["theoretically_safe"]
-            for dataset in dataset_metadata
+        "travel_time_per_edge": (
+            travel_time_per_edge
+            if timed_movement
+            else 0.0
         ),
-        "unsafe_dataset_count": sum(
-            not dataset["theoretically_safe"]
-            for dataset in dataset_metadata
+        "safe_dataset_count": safe_dataset_count,
+        "unsafe_dataset_count": (
+            dataset_count - safe_dataset_count
         ),
         "datasets": dataset_metadata,
     }
@@ -316,35 +413,37 @@ def parse_arguments() -> argparse.Namespace:
     """Read command-line arguments."""
 
     parser = argparse.ArgumentParser(
-        description="Generate one rover PDDL+ problem instance."
+        description="Generate one rover PDDL+ problem."
     )
 
     parser.add_argument(
         "--datasets",
         type=int,
         required=True,
-        help="Number of scientific datasets.",
     )
 
     parser.add_argument(
         "--memory",
         choices=["low", "medium", "high"],
         required=True,
-        help="Memory-pressure level.",
     )
 
     parser.add_argument(
         "--corruption",
         choices=["low", "medium", "high"],
         required=True,
-        help="Corruption-severity level.",
     )
 
     parser.add_argument(
         "--seed",
         type=int,
         required=True,
-        help="Random mission seed.",
+    )
+
+    parser.add_argument(
+        "--model",
+        choices=["original", "timed"],
+        default="original",
     )
 
     parser.add_argument(
@@ -353,7 +452,6 @@ def parse_arguments() -> argparse.Namespace:
         default=Path(
             "experiments/config/experiment_config.json"
         ),
-        help="Path to the experiment configuration.",
     )
 
     parser.add_argument(
@@ -362,14 +460,13 @@ def parse_arguments() -> argparse.Namespace:
         default=Path(
             "experiments/generated_problems"
         ),
-        help="Directory for generated PDDL and metadata files.",
     )
 
     return parser.parse_args()
 
 
 def main() -> int:
-    """Generate and save one reproducible problem instance."""
+    """Generate and save one problem."""
 
     arguments = parse_arguments()
 
@@ -382,6 +479,7 @@ def main() -> int:
             memory_level=arguments.memory,
             corruption_level=arguments.corruption,
             seed=arguments.seed,
+            model=arguments.model,
         )
 
         arguments.output_dir.mkdir(
@@ -425,17 +523,14 @@ def main() -> int:
 
         return 0
 
-    except (
-        FileNotFoundError,
-        ValueError,
-        KeyError,
-        json.JSONDecodeError,
-    ) as error:
+    except Exception as error:
         print(
             json.dumps(
                 {
                     "status": "generation_error",
-                    "error": str(error),
+                    "error": (
+                        f"{type(error).__name__}: {error}"
+                    ),
                 },
                 indent=2,
             )

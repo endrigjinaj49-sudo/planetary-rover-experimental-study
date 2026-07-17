@@ -1,0 +1,20 @@
+{
+  "status": "batch_complete",
+  "results_file": "/mnt/c/Users/Endri/Desktop/planetary-rover-experimental-study/experiments/results/timed_pilot_seed_0.csv",
+  "requested_instances": 27,
+  "completed_instances": 27,
+  "solved": 18,
+  "unsolvable": 9,
+  "timeout": 0,
+  "error": 0,
+  "unknown": 0,
+  "skipped": 0,
+  "mean_wall_runtime_seconds": 1.430154,
+  "total_batch_runtime_seconds": 39.019276,
+  "runs_per_condition": 1,
+  "seed_start": 0,
+  "model": "timed",
+  "domain": "/mnt/c/Users/Endri/Desktop/planetary-rover-experimental-study/planning_models/pddl_plus/domain-memory-rover-experimental.pddl",
+  "planner": "ENHSP default",
+  "timeout_seconds": 60.0
+}
