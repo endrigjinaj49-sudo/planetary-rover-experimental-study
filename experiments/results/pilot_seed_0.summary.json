@@ -1,0 +1,18 @@
+{
+  "status": "batch_complete",
+  "results_file": "/mnt/c/Users/Endri/Desktop/planetary-rover-experimental-study/experiments/results/pilot_seed_0.csv",
+  "requested_instances": 27,
+  "completed_instances": 27,
+  "solved": 18,
+  "unsolvable": 9,
+  "timeout": 0,
+  "error": 0,
+  "unknown": 0,
+  "skipped": 0,
+  "mean_wall_runtime_seconds": 0.76466,
+  "total_batch_runtime_seconds": 21.033293,
+  "runs_per_condition": 1,
+  "seed_start": 0,
+  "planner": "ENHSP default",
+  "timeout_seconds": 60.0
+}
